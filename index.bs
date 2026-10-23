@@ -2475,7 +2475,8 @@ BrowserCommand = (
   browser.GetUserContexts //
   browser.RemoveUserContext //
   browser.SetClientWindowState //
-  browser.SetDownloadBehavior
+  browser.SetDownloadBehavior //
+  browser.SetFileDialogBehavior
 )
 </pre>
 
@@ -2490,7 +2491,8 @@ BrowserResult = (
   browser.GetUserContextsResult /
   browser.RemoveUserContextResult /
   browser.SetClientWindowStateResult /
-  browser.SetDownloadBehaviorResult
+  browser.SetDownloadBehaviorResult /
+  browser.SetFileDialogBehaviorResult
 )
 </pre>
 
@@ -3242,6 +3244,120 @@ The [=remote end steps=] with <var ignore>session</var> and |command parameters|
 
 1. Otherwise, set [=download behavior=]'s [=download behavior/default download behavior=] to
    |download behavior|.
+
+1. Return [=success=] with data null.
+
+</div>
+
+#### The browser.setFileDialogBehavior Command #### {#command-browser-setFileDialogBehavior}
+
+A <dfn>file dialog behavior struct</dfn> is a [=struct=] with:
+* [=struct/item=] named <dfn id="file-dialog-behavior-struct-accepted" for="file-dialog-behavior-struct">accepted</dfn> which is a boolean;
+* [=struct/item=] named <dfn id="file-dialog-behavior-struct-files" for="file-dialog-behavior-struct">files</dfn> which is a [=/list=] of strings or null.
+
+A [=remote end=] has a <dfn>file dialog behavior</dfn> which is a [=struct=] with an [=struct/item=]
+named <dfn for="file dialog behavior">default file dialog behavior</dfn>, which is a
+[=file dialog behavior struct=] or null, and an [=struct/item=] named <dfn
+for="file dialog behavior">user context file dialog behavior</dfn>, which is a weak map between
+[=user context|user contexts=] and [=file dialog behavior struct=].
+
+<dl>
+   <dt>Command Type</dt>
+   <dd>
+      <pre class="cddl" data-cddl-module="remote-cddl">
+      browser.SetFileDialogBehavior = (
+        method: "browser.setFileDialogBehavior",
+        params: browser.SetFileDialogBehaviorParameters
+      )
+
+      browser.SetFileDialogBehaviorParameters = {
+        fileDialogBehavior: browser.FileDialogBehavior / null,
+        ? userContexts: [+browser.UserContext]
+      }
+
+      browser.FileDialogBehavior = {
+        (
+          browser.FileDialogBehaviorAccept //
+          browser.FileDialogBehaviorCancel
+        )
+      }
+
+      browser.FileDialogBehaviorAccept = (
+        type: "accept",
+        files: [+text]
+      )
+
+      browser.FileDialogBehaviorCancel = (
+        type: "cancel"
+      )
+      </pre>
+   </dd>
+   <dt>Return Type</dt>
+   <dd>
+      <pre class="cddl" data-cddl-module="local-cddl">
+      browser.SetFileDialogBehaviorResult = EmptyResult
+      </pre>
+   </dd>
+</dl>
+
+<div algorithm>
+To <dfn export>get file dialog behavior</dfn> given |navigable|:
+
+1. Let |user context| be |navigable|'s [=associated user context=].
+
+1. If [=file dialog behavior=]'s [=file dialog behavior/user context file dialog behavior=] [=map/contains=]
+   |user context|, return [=file dialog behavior=]'s
+   [=file dialog behavior/user context file dialog behavior=][|user context|].
+
+1. Return [=file dialog behavior=]'s [=file dialog behavior/default file dialog behavior=].
+
+</div>
+
+<div algorithm="remote end steps for browser.setFileDialogBehavior">
+
+The [=remote end steps=] with <var ignore>session</var> and |command parameters| are:
+
+1. If |command parameters|["<code>fileDialogBehavior</code>"] is null, let
+   |file dialog behavior| be null.
+
+1. Otherwise:
+
+   1. If |command parameters|["<code>fileDialogBehavior</code>"]["<code>type</code>"]
+      is "<code>accept</code>", let |accepted| be true, otherwise let |accepted| be
+      false.
+
+   1. If |command parameters|["<code>fileDialogBehavior</code>"] [=map/contains=]
+      "<code>files</code>", let |files| be
+      |command parameters|["<code>fileDialogBehavior</code>"]["<code>files</code>"],
+      otherwise let |files| be null.
+
+   1. Let |file dialog behavior| be a [=file dialog behavior struct=] with
+      [=file-dialog-behavior-struct/accepted=] set to |accepted| and
+      [=file-dialog-behavior-struct/files=] set to |files|.
+
+1. If the implementation does not support required |file dialog behavior|, then return
+   [=error=] with [=error code=] [=unsupported operation=].
+
+1. If the <code>userContexts</code> field of |command parameters| is present:
+
+   1. If the implementation is unable to configure file dialog behavior per
+      [=user context=], then return [=error=] with [=error code=]
+      [=unsupported operation=].
+
+   1. Let |user contexts| be the result of [=trying=] to [=get valid user contexts=]
+      with |command parameters|["<code>userContexts</code>"].
+
+   1. For each |user context| of |user contexts|:
+
+      1. If |file dialog behavior| is null, [=map/remove=] |user context| from [=file dialog behavior=]'s
+         [=file dialog behavior/user context file dialog behavior=].
+
+      1. Otherwise, [=map/set=] [=file dialog behavior=]'s
+         [=file dialog behavior/user context file dialog behavior=][|user context|] to
+         |file dialog behavior|.
+
+1. Otherwise, set [=file dialog behavior=]'s [=file dialog behavior/default file dialog behavior=] to
+   |file dialog behavior|.
 
 1. Return [=success=] with data null.
 
@@ -15419,6 +15535,10 @@ opened.
 
   1. [=Emit an event=] with |session| and |body|.
 
+1. Let |file dialog behavior| be [=get file dialog behavior=] with |navigable|.
+
+1. If |file dialog behavior| is not null, return |file dialog behavior|.
+
 1. Let |dismissed| be false.
 
 1. For each |session| in [=active BiDi sessions=]:
@@ -15438,7 +15558,11 @@ opened.
       |user prompt handler|["<code>default</code>"] is not equal to
       "<code>ignore</code>", set |dismissed| to true.
 
-1. Return |dismissed|.
+1. If |dismissed| is true, return a [=file dialog behavior struct=] with
+   [=file-dialog-behavior-struct/accepted=] set to false and
+   [=file-dialog-behavior-struct/files=] set to null.
+
+1. Return null.
 
 </div>
 
