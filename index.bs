@@ -15494,13 +15494,16 @@ A <dfn>WebDriver BiDi file picker options</dfn> is a [=struct=] with an [=struct
 
 <div algorithm>
 The [=remote end event trigger=] is the
-<dfn export>WebDriver BiDi file dialog opened</dfn> steps, given [=/element=] |element| and
+<dfn export>WebDriver BiDi file dialog opened</dfn> steps, given [=/element=] or null |element| and
 optionally [=WebDriver BiDi file picker options=] |file picker options| (default: null):
 
 Note: unlike other user prompt handlers, the default behavior is to allow for the file dialog to be
 opened.
 
-1. Let |navigable| be the |element|'s [=node document=]'s [=/navigable=].
+1. If |element| is not null, let |navigable| be |element|'s [=node document=]'s [=/navigable=].
+
+1. Otherwise, let |navigable| be [=current settings object=]'s [=relevant global object=]'s
+   <a>associated <code>Document</code></a>'s [=/node navigable=].
 
 1. Let |navigable id| be |navigable|'s [=navigable id=].
 
@@ -15537,7 +15540,15 @@ opened.
 
 1. Let |file dialog behavior| be [=get file dialog behavior=] with |navigable|.
 
-1. If |file dialog behavior| is not null, return |file dialog behavior|.
+1. If |file dialog behavior| is not null:
+
+  1. If |multiple| is <code>false</code>, |file dialog behavior|'s
+     [=file-dialog-behavior-struct/files=] is not null, and [=list/size=] of
+     |file dialog behavior|'s [=file-dialog-behavior-struct/files=] is greater than 1,
+     return a [=file dialog behavior struct=] with [=file-dialog-behavior-struct/accepted=]
+     set to false and [=file-dialog-behavior-struct/files=] set to null.
+
+  1. Return |file dialog behavior|.
 
 1. Let |dismissed| be false.
 
